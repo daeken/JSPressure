@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+	<head>
+		<title>JSPressure</title>
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+		<script src="/main.js"></script>
+	</head>
+	<body>
+		<h1>Material</h1>
+		Main category: <select id="main-category"></select><br>
+		Sub category: <select id="sub-category"></select><br>
+		Material name: <select id="material-name"></select><br>
+		<br>
+		<div id="cg-qual">
+			Ultimate strength (tensile): <input id="ult-tensile" type="text"> Ksi<br>
+			Ultimate strength (compressive): <input id="ult-comp" type="text"> Ksi<br>
+		</div>
+		<div id="metal-qual" style="display: none">
+			Yield strength: <input id="yield-strength" type="text"> Ksi<br>
+		</div>
+		<div id="plastic-qual" style="display: none">
+			Ultimate strength: <input id="ult" type="text"> Ksi<br>
+			Working strength: <input id="working" type="text"> Ksi<br>
+		</div>
+		Young's modulus: <input id="young" type="text"> Mpsi<br>
+		Density: <input id="density" type="text"> lbs/in^3<br>
+		Poisson's ratio: <input id="poisson" type="text"><br>
+	</body>
+</html>
