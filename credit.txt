@@ -1,0 +1,1 @@
+The parameters and overall design of this application is being taken pretty much directly from Under Pressure by Deepsea Power & Light.  These guys are awesome and I sincerely hope that they don't hate me for rewriting their app!
