@@ -1,3 +1,7 @@
+Number.prototype.trunc = (digits) ->
+	exp = Math.pow 10, digits
+	Math.floor(this * exp) / exp
+
 class JSPressure
 	constructor: ->
 		$.getJSON 'materials.json', (@materials) =>
@@ -100,15 +104,15 @@ class JSPressure
 			@volume = total_volume - inner_volume
 
 		$('#volume').text @volume
-		@weight_lbs = @volume / 16387 * @f('density')
+		@weight_lbs = @volume / 16387 * @f('density') # Volume is mm^3, density is lbs/in^3
 		@weight_kg = @weight_lbs / 2.2046
-		$('#mass-lbs').text @weight_lbs
-		$('#mass-kg').text @weight_kg
+		$('#mass-lbs').text @weight_lbs.trunc(4)
+		$('#mass-kg').text @weight_kg.trunc(4)
 
-		water_lbs = @weight_lbs - (total_volume / 16387 * 0.037) # Density of water, 1025 kg/m^3
+		water_lbs = @weight_lbs - (total_volume / 16387 * 0.03704) # Density of water, 1025.3 kg/m^3
 		water_kg = water_lbs / 2.2046
-		$('#water-lbs').text water_lbs
-		$('#water-kg').text water_kg
+		$('#water-lbs').text water_lbs.trunc(4)
+		$('#water-kg').text water_kg.trunc(4)
 
 $ ->
 	new JSPressure
