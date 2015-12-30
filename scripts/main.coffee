@@ -114,5 +114,47 @@ class JSPressure
 		$('#water-lbs').text water_lbs.trunc(4)
 		$('#water-kg').text water_kg.trunc(4)
 
+# q = unit pressure, a = outer radius, b = inner radius, l = length, E = modulus of elasticity, v = Poisson's ratio
+# page 683
+thick_cylinder_1c = (q, a, b, l, E, v) ->
+	r = (a - b) / 2 + b
+
+	s1 = (-q * a * a) / (a*a - b*b) # THIS IS WRONG -- copied from 1d
+	s2 = (-q * a * a * (b * b + r * r)) / (r*r * (a*a - b*b))
+	s2_max = (-q * 2 * a * a) / (a * a - b * b)
+	s3 = (-q * a * a * (r * r - b * b)) / (r * r * (a * a - b * b))
+	s3_max = -q
+
+	t_max = s2_max / 2
+	da = ((-q * a) / E) * (((a * a + b * b) / (a * a - b * b)) - v)
+	db = (-q / E) * ((2 * a * a) / (a * a - b * b))
+	dl = ((q * v * l) / E) * ((2 * a * a) / (a * a - b * b))
+	console.log da * 2.54, db * 2.54, dl * 2.54
+
+sq = (x) -> x * x
+
+mises = (a, b, c) ->
+	Math.sqrt(.5 * (sq(a - b) + sq(b - c) + sq(c - a)))
+
+# q = unit pressure [psi], a = outer radius [in], b = inner radius [in], l = length [in], 
+# E = modulus of elasticity [psi], v = Poisson's ratio
+# page 684
+thick_cylinder_1d = (q, a, b, l, E, v) ->
+	r = (a - b) / 2 + b
+
+	s1 = (-q * a * a) / (a*a - b*b)
+	s2_max = (-q * 2 * a * a) / (a * a - b * b)
+
+	equiv = mises(s1, s2_max, 0)
+
+	da = ((-q * a) / E) * ((a * a * (1 - 2 * v) + b * b * (1 + v)) / (a * a - b * b))
+	db = ((-q * b) / E) * ((a * a * (2 - v)) / (a * a - b * b))
+	dl = ((-q * l) / E) * ((a * a * (1 - 2 * v)) / (a * a - b * b))
+
+	# Max axial stress [psi], Max hoop stress [psi], Max equiv stress [psi]
+	# ID deviation [mm], OD deviation [mm], length deviation [mm]
+	[s1, s2_max, equiv,
+	 db * 25.4 * 2, da * 25.4 * 2, dl * 25.4]
+
 $ ->
 	new JSPressure
