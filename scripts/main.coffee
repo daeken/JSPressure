@@ -4,6 +4,7 @@ Number.prototype.trunc = (digits) ->
 
 class JSPressure
 	constructor: ->
+		@loaded = false
 		$.getJSON 'materials.json', (@materials) =>
 			$('#main-category').append('<option disabled selected></option>')
 			for k, v of @materials
@@ -73,11 +74,16 @@ class JSPressure
 			nv = localStorage.getItem(e.id)
 			$(e).val(nv)
 			$(e).change()
+		@loaded = true
 
 	update: =>
-		@save()
+		if @loaded
+			@save()
 
 		@calculate_volume()
+		[psi, stresses] = @search_fail()
+		$('#fail-psi').text psi.trunc(3)
+		$('#fail-depth').text psi2seadepth(psi).trunc(3)
 
 	f: (name) ->
 		parseFloat($('#' + name).val())
@@ -114,33 +120,69 @@ class JSPressure
 		$('#water-lbs').text water_lbs.trunc(4)
 		$('#water-kg').text water_kg.trunc(4)
 
-# q = unit pressure, a = outer radius, b = inner radius, l = length, E = modulus of elasticity, v = Poisson's ratio
-# page 683
-thick_cylinder_1c = (q, a, b, l, E, v) ->
-	r = (a - b) / 2 + b
+	# Returns true/false for pass/fail, then stresses relevant to geometry
+	calculate_stress: (psi) ->
+		if @shape == 'tube'
+			[axial, hoop, equiv, did, dod, dl] = thick_cylinder_1d(
+				psi, 
+				@f('tube-id') + @f('tube-thickness') * 2, 
+				@f('tube-id'), 
+				@f('tube-length'), 
+				@f('young') * 1000000, # Mpsi -> Psi
+				@f('poisson')
+			)
+		else if @shape == 'sphere'
+			[merid, hoop, equiv, did, dod] = thick_sphere_2b(
+				psi, 
+				@f('sphere-id') + @f('sphere-thickness') * 2, 
+				@f('sphere-id'), 
+				@f('young') * 1000000, # Mpsi -> Psi
+				@f('poisson')
+			)
 
-	s1 = (-q * a * a) / (a*a - b*b) # THIS IS WRONG -- copied from 1d
-	s2 = (-q * a * a * (b * b + r * r)) / (r*r * (a*a - b*b))
-	s2_max = (-q * 2 * a * a) / (a * a - b * b)
-	s3 = (-q * a * a * (r * r - b * b)) / (r * r * (a * a - b * b))
-	s3_max = -q
+		if @cattype == 'Metals'
+			pass = @f('yield-strength') > equiv / 1000
+		else if @cattype == 'Plastics'
+			pass = @f('ult') > Math.abs(hoop) / 1000
+		else if @cattype == 'Ceramics' or @cattype == 'Glass'
+			pass = @f('ult-comp') > Math.abs(hoop) / 1000
 
-	t_max = s2_max / 2
-	da = ((-q * a) / E) * (((a * a + b * b) / (a * a - b * b)) - v)
-	db = (-q / E) * ((2 * a * a) / (a * a - b * b))
-	dl = ((q * v * l) / E) * ((2 * a * a) / (a * a - b * b))
-	console.log da * 2.54, db * 2.54, dl * 2.54
+		if @shape == 'tube'
+			[pass, [axial, hoop, equiv, did, dod, dl]]
+		else if @shape == 'sphere'
+			[pass, [merid, hoop, equiv, did, dod]]
+
+	# Returns pressure and stresses relevant to geometry for failing case
+	search_fail: ->
+		recur = (low, high) =>
+			if high - low <= 1
+				return [high, @calculate_stress(high)[1]]
+			else
+				mid = (high - low) / 2 + low
+				if @calculate_stress(mid)[0] == true # midpoint pass
+					return recur(mid, high)
+				else
+					return recur(low, mid)
+		[psi, stresses] = recur(1, 10000000)
+		console.log psi, stresses
+		[psi, stresses]
+
+mm2in = (x) -> x / 25.4
+# Depth in m
+psi2seadepth = (psi) -> ((-0.444 + Math.sqrt(.444 * .444 - 4 * (.3 / (1000 * 1000)) * -psi)) / (2 * (.3 / (1000 * 1000)))) * .3048
 
 sq = (x) -> x * x
 
 mises = (a, b, c) ->
 	Math.sqrt(.5 * (sq(a - b) + sq(b - c) + sq(c - a)))
 
-# q = unit pressure [psi], a = outer radius [in], b = inner radius [in], l = length [in], 
+# q = unit pressure [psi], a = outer diameter [mm], b = inner diameter [mm], l = length [mm], 
 # E = modulus of elasticity [psi], v = Poisson's ratio
 # page 684
 thick_cylinder_1d = (q, a, b, l, E, v) ->
-	r = (a - b) / 2 + b
+	a = mm2in(a) / 2
+	b = mm2in(b) / 2
+	l = mm2in(l)
 
 	s1 = (-q * a * a) / (a*a - b*b)
 	s2_max = (-q * 2 * a * a) / (a * a - b * b)
@@ -155,6 +197,25 @@ thick_cylinder_1d = (q, a, b, l, E, v) ->
 	# ID deviation [mm], OD deviation [mm], length deviation [mm]
 	[s1, s2_max, equiv,
 	 db * 25.4 * 2, da * 25.4 * 2, dl * 25.4]
+
+# q = unit pressure [psi], a = outer diameter [mm], b = inner diameter [mm], 
+# E = modulus of elasticity [psi], v = Poisson's ratio
+# page 685
+thick_sphere_2b = (q, a, b, E, v) ->
+	a = mm2in(a) / 2
+	b = mm2in(b) / 2
+
+	ac = a * a * a
+	bc = b * b * b
+
+	s1 = s2 = (-q * 3 * ac) / (2 * (ac - bc))
+	equiv = mises(s1, s2, 0)
+
+	da = ((-q * a) / E) * (((1 - v) * (bc + 2 * ac)) / (2 * (ac - bc)) - v)
+	db = ((-q * b) / E) * ((3 * (1 - v) * ac) / (2 * (ac - bc)))
+
+	[s1, s2, equiv, 
+	 db * 25.4 * 2, da * 25.4 * 2]
 
 $ ->
 	new JSPressure
